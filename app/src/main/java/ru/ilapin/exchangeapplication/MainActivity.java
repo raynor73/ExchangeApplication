@@ -1,9 +1,9 @@
 package ru.ilapin.exchangeapplication;
 
-import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import ru.ilapin.common.android.viewmodelprovider.ViewModelProviderActivity;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends ViewModelProviderActivity {
 
 	@Override
 	protected void onCreate(final Bundle savedInstanceState) {
