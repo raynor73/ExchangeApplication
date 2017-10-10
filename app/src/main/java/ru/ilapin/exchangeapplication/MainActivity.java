@@ -2,14 +2,15 @@ package ru.ilapin.exchangeapplication;
 
 import android.os.Bundle;
 import android.widget.TextView;
-
-import javax.inject.Inject;
-
 import butterknife.BindView;
 import butterknife.ButterKnife;
-import io.reactivex.disposables.Disposable;
+import io.reactivex.functions.Consumer;
 import ru.ilapin.common.android.viewmodelprovider.ViewModelProviderActivity;
 import ru.ilapin.exchangeapplication.backend.Backend;
+import ru.ilapin.exchangeapplication.backend.Result;
+
+import javax.inject.Inject;
+import java.util.Map;
 
 public class MainActivity extends ViewModelProviderActivity {
 
@@ -19,7 +20,11 @@ public class MainActivity extends ViewModelProviderActivity {
 	@BindView(R.id.rate)
 	TextView mRateTextView;
 
-	private Disposable mRateSubscription;
+	private final Consumer<Result<Map<String, Double>>> mRateObservable = result -> {
+		if (!result.isEmpty()) {
+			mRateTextView.setText(String.valueOf(result.getData().get(Backend.Currency.EUR.toString())));
+		}
+	};
 
 	@Override
 	protected void onCreate(final Bundle savedInstanceState) {
@@ -34,17 +39,13 @@ public class MainActivity extends ViewModelProviderActivity {
 	protected void onResume() {
 		super.onResume();
 
-		mRateSubscription = mBackend.getExchangeRateObservable(Backend.Currency.USD).subscribe(result -> {
-			if (!result.isEmpty()) {
-				mRateTextView.setText(String.valueOf(result.getData().get("EUR")));
-			}
-		});
+		mBackend.subscribeForRatesChanges(Backend.Currency.USD, mRateObservable);
 	}
 
 	@Override
 	protected void onPause() {
 		super.onPause();
 
-		mRateSubscription.dispose();
+		mBackend.unsubscribeFromRatesChanges(mRateObservable);
 	}
 }
