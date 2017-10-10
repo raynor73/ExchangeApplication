@@ -34,7 +34,7 @@ public class MainActivity extends ViewModelProviderActivity {
 	protected void onResume() {
 		super.onResume();
 
-		mRateSubscription = mBackend.getExchangeRateObservable(Backend.RateBase.USD).subscribe(result -> {
+		mRateSubscription = mBackend.getExchangeRateObservable(Backend.Currency.USD).subscribe(result -> {
 			if (!result.isEmpty()) {
 				mRateTextView.setText(String.valueOf(result.getData().get("EUR")));
 			}

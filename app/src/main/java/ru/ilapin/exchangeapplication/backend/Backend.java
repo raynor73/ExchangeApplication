@@ -12,27 +12,37 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import io.reactivex.Observable;
+import io.reactivex.Observer;
 import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.disposables.Disposable;
 import io.reactivex.schedulers.Schedulers;
+import io.reactivex.subjects.BehaviorSubject;
 import okhttp3.ResponseBody;
 import retrofit2.Retrofit;
 
-import static android.content.ContentValues.TAG;
-
 public class Backend {
+
+	private static final String TAG = "Backend";
 
 	private static final String BASE_URL = "http://api.fixer.io/";
 
 	private final FixerService mFixerService;
+
+	private final BehaviorSubject<Result<Map<String, Double>>> mRatesChangesSubject = BehaviorSubject.create();
+	private final Map<Observer<Result<Map<String, Double>>>, Disposable> mSubscriptions = new HashMap<>();
 
 	public Backend() {
 		final Retrofit retrofit = new Retrofit.Builder().baseUrl(BASE_URL).build();
 		mFixerService = retrofit.create(FixerService.class);
 	}
 
-	public Observable<Result<Map<String, Double>>> getExchangeRateObservable(final RateBase base) {
+	public void subscribeForRatesChanges(final Currency base,
+										 final Observer<Result<Map<String, Double>>> observer) {
 		final Observable<Result<Map<String, Double>>> resultObservable = Observable
-				.<Result<ResponseBody>>create(subscriber -> subscriber.onNext(new Result<>(makeRatesRequest(base), false, false)))
+				.<Result<ResponseBody>>create(subscriber -> {
+					Log.d(TAG, "Requesting rates");
+					subscriber.onNext(new Result<>(makeRatesRequest(base), false, false));
+				})
 				.onErrorReturn(throwable -> {
 					Log.d(TAG, "Bad response: " + throwable.getMessage());
 					return new Result<>(null, true, true);
@@ -49,14 +59,49 @@ public class Backend {
 					return new Result<>(null, true, true);
 				});
 
-		return Observable
-				.interval(0, 30, TimeUnit.SECONDS)
+		mSubscriptions.put(observer, Observable
+				.interval(0, 3, TimeUnit.SECONDS)
 				.flatMap(x -> resultObservable)
 				.subscribeOn(Schedulers.io())
-				.observeOn(AndroidSchedulers.mainThread());
+				.observeOn(AndroidSchedulers.mainThread())
+				.subscribe(mRatesChangesSubject::onNext));
+
+		mRatesChangesSubject.subscribe(observer);
 	}
 
-	private ResponseBody makeRatesRequest(final RateBase base) throws IOException {
+	public Observable<Result<Map<String, Double>>> getExchangeRateObservable(final Currency base) {
+		final Observable<Result<Map<String, Double>>> resultObservable = Observable
+				.<Result<ResponseBody>>create(subscriber -> {
+					Log.d(TAG, "Requesting rates");
+					subscriber.onNext(new Result<>(makeRatesRequest(base), false, false));
+				})
+				.onErrorReturn(throwable -> {
+					Log.d(TAG, "Bad response: " + throwable.getMessage());
+					return new Result<>(null, true, true);
+				})
+				.<Result<Map<String, Double>>>map(result -> {
+					if (result.isEmpty() || result.hasError()) {
+						return new Result<>(null, result.hasError(), result.isEmpty());
+					} else {
+						return new Result<>(parseRates(result.getData().string()), false, false);
+					}
+				})
+				.onErrorReturn(throwable -> {
+					Log.d(TAG, "Can't parse: " + throwable.getMessage());
+					return new Result<>(null, true, true);
+				});
+
+		Observable
+				.interval(0, 3, TimeUnit.SECONDS)
+				.flatMap(x -> resultObservable)
+				.subscribeOn(Schedulers.io())
+				.observeOn(AndroidSchedulers.mainThread())
+				.subscribe(mRatesChangesSubject);
+
+		return mRatesChangesSubject;
+	}
+
+	private ResponseBody makeRatesRequest(final Currency base) throws IOException {
 		return mFixerService.latest(base.toString()).execute().body();
 	}
 
@@ -73,7 +118,7 @@ public class Backend {
 		return rates;
 	}
 
-	public enum RateBase {
+	public enum Currency {
 		GBP, EUR, USD
 	}
 }
