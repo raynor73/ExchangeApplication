@@ -3,9 +3,9 @@ package ru.ilapin.exchangeapplication.backend;
 import android.util.Log;
 import com.google.common.base.Preconditions;
 import io.reactivex.Observable;
+import io.reactivex.Observer;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.Disposable;
-import io.reactivex.functions.Consumer;
 import io.reactivex.schedulers.Schedulers;
 import io.reactivex.subjects.BehaviorSubject;
 import okhttp3.ResponseBody;
@@ -26,15 +26,17 @@ public class Backend {
 	private final FixerService mFixerService;
 
 	private final BehaviorSubject<Result<Map<String, Double>>> mRatesChangesSubject = BehaviorSubject.create();
-	private final Map<Consumer<Result<Map<String, Double>>>, RatesSubscriptions> mSubscriptions = new HashMap<>();
+	private final Map<Observer<Result<Map<String, Double>>>, RatesSubscriptions> mSubscriptions = new HashMap<>();
 
 	public Backend() {
 		final Retrofit retrofit = new Retrofit.Builder().baseUrl(BASE_URL).build();
 		mFixerService = retrofit.create(FixerService.class);
+
+		mRatesChangesSubject.onNext(new Result<>(null, false, true));
 	}
 
 	public void subscribeForRatesChanges(final Currency base,
-										 final Consumer<Result<Map<String, Double>>> observer) {
+										 final Observer<Result<Map<String, Double>>> observer) {
 		final Observable<Result<Map<String, Double>>> resultObservable = Observable
 				.<Result<ResponseBody>>create(subscriber -> {
 					Log.d(TAG, "Requesting rates");
@@ -56,7 +58,7 @@ public class Backend {
 					return new Result<>(null, true, true);
 				});
 
-		final Disposable subjectSubscription = mRatesChangesSubject.subscribe(observer);
+		final Disposable subjectSubscription = mRatesChangesSubject.subscribe(observer::onNext);
 		final Disposable intervalSubscription = Observable.interval(0, 3, TimeUnit.SECONDS)
 				.flatMap(x -> resultObservable)
 				.subscribeOn(Schedulers.io())
@@ -66,7 +68,7 @@ public class Backend {
 		mSubscriptions.put(observer, new RatesSubscriptions(subjectSubscription, intervalSubscription));
 	}
 
-	public void unsubscribeFromRatesChanges(final Consumer<Result<Map<String, Double>>> observer) {
+	public void unsubscribeFromRatesChanges(final Observer<Result<Map<String, Double>>> observer) {
 		final RatesSubscriptions subscriptions = Preconditions.checkNotNull(mSubscriptions.get(observer));
 		subscriptions.getIntervalSubscription().dispose();
 		subscriptions.getSubjectSubscription().dispose();
@@ -110,6 +112,6 @@ public class Backend {
 	}
 
 	public enum Currency {
-		GBP, EUR, USD
+		USD, EUR, GBP
 	}
 }

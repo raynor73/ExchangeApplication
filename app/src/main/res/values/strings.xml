@@ -1,3 +1,8 @@
 <resources>
 	<string name="app_name">Exchange Application</string>
+	<string name="amount">Amount</string>
+	<string name="from">From</string>
+	<string name="to">To</string>
+	<string name="rate">Rate:</string>
+	<string name="n_a">N/A</string>
 </resources>
