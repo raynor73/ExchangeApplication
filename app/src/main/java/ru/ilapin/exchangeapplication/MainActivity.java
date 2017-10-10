@@ -2,6 +2,7 @@ package ru.ilapin.exchangeapplication;
 
 import android.os.Bundle;
 import android.text.*;
+import android.util.Log;
 import android.view.View;
 import android.widget.*;
 import butterknife.*;
@@ -64,6 +65,7 @@ public class MainActivity extends ViewModelProviderActivity {
 			@Override
 			public void onItemSelected(final AdapterView<?> adapterView, final View view, final int position,
 					final long id) {
+				Log.d("!@#", "mFromCurrencySpinner: onItemSelected: " + position);
 				mViewModel.getFromCurrencyObserver().onNext(Backend.Currency.values()[position]);
 			}
 		});
@@ -73,6 +75,7 @@ public class MainActivity extends ViewModelProviderActivity {
 			@Override
 			public void onItemSelected(final AdapterView<?> adapterView, final View view, final int position,
 					final long id) {
+				Log.d("!@#", "mToCurrencySpinner: onItemSelected: " + position);
 				mViewModel.getToCurrencyObserver().onNext(Backend.Currency.values()[position]);
 			}
 		});

@@ -55,19 +55,22 @@ public class ExchangeViewModel implements ViewModel {
 				mFromCurrencySubject,
 				mToCurrencySubject,
 				(rates, fromCurrency, toCurrency) -> {
+					Log.d("!@#", "fromCurrency: " + fromCurrency + ", toCurrency: " + toCurrency);
+
 					if (!rates.isEmpty() && fromCurrency != toCurrency) {
-						return new Result<>(new CurrentRateParams(fromCurrency, toCurrency, rates.getData()), false, false);
+						return new Result<>(new CurrentRateParams(toCurrency, rates.getData()), false, false);
 					}
 
 					return new Result<CurrentRateParams>(null, false, true);
 				}
 		).subscribe(currentRateParamsResult -> {
 			if (!currentRateParamsResult.isEmpty()) {
-				final String fromCurrency = currentRateParamsResult.getData().getFromCurrency().toString();
 				final String toCurrency = currentRateParamsResult.getData().getToCurrency().toString();
 				final Map<String, Double> rates = currentRateParamsResult.getData().getRates();
 				final double rate = rates.get(toCurrency);
 				mRateObservable.onNext(new Result<>(rate, false, false));
+			} else {
+				mRateObservable.onNext(new Result<>(null, false, true));
 			}
 		});
 
@@ -133,19 +136,13 @@ public class ExchangeViewModel implements ViewModel {
 
 	private class CurrentRateParams {
 
-		private final Backend.Currency mFromCurrency;
 		private final Backend.Currency mToCurrency;
 		private final Map<String, Double> mRates;
 
-		public CurrentRateParams(final Backend.Currency fromCurrency, final Backend.Currency toCurrency,
+		public CurrentRateParams(final Backend.Currency toCurrency,
 				final Map<String, Double> rates) {
-			mFromCurrency = fromCurrency;
 			mToCurrency = toCurrency;
 			mRates = rates;
-		}
-
-		public Backend.Currency getFromCurrency() {
-			return mFromCurrency;
 		}
 
 		public Backend.Currency getToCurrency() {
