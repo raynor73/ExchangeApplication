@@ -2,6 +2,9 @@ package ru.ilapin.exchangeapplication;
 
 import android.text.TextUtils;
 import android.util.Log;
+
+import java.util.Map;
+
 import io.reactivex.Observable;
 import io.reactivex.Observer;
 import io.reactivex.subjects.BehaviorSubject;
@@ -9,8 +12,6 @@ import io.reactivex.subjects.PublishSubject;
 import ru.ilapin.common.android.viewmodelprovider.ViewModel;
 import ru.ilapin.exchangeapplication.backend.Backend;
 import ru.ilapin.exchangeapplication.backend.Result;
-
-import java.util.Map;
 
 public class ExchangeViewModel implements ViewModel {
 
@@ -31,8 +32,8 @@ public class ExchangeViewModel implements ViewModel {
 
 	private boolean mIsRatesSubscriptionToBackendMade;
 
-	private String mPrevFromAmount;
-	private String mPrevToAmount;
+	private String mPrevFromAmountString;
+	private String mPrevToAmountString;
 
 	public ExchangeViewModel(final Backend backend) {
 		mBackend = backend;
@@ -41,22 +42,11 @@ public class ExchangeViewModel implements ViewModel {
 		mFromAmountObservable.onNext(new Result<>(.0, false, true));
 		mToAmountObservable.onNext(new Result<>(.0, false, true));
 
-		mFromCurrencySubject.subscribe(currency -> {
-			if (mIsRatesSubscriptionToBackendMade) {
-				mBackend.unsubscribeFromRatesChanges(mBackendRatesSubject);
-			}
-
-			mBackend.subscribeForRatesChanges(currency, mBackendRatesSubject);
-			mIsRatesSubscriptionToBackendMade = true;
-		});
-
 		Observable.combineLatest(
 				mBackendRatesSubject,
 				mFromCurrencySubject,
 				mToCurrencySubject,
 				(rates, fromCurrency, toCurrency) -> {
-					Log.d("!@#", "fromCurrency: " + fromCurrency + ", toCurrency: " + toCurrency);
-
 					if (!rates.isEmpty() && fromCurrency != toCurrency) {
 						return new Result<>(new CurrentRateParams(toCurrency, rates.getData()), false, false);
 					}
@@ -74,7 +64,7 @@ public class ExchangeViewModel implements ViewModel {
 			}
 		});
 
-		Observable.zip(
+		Observable.combineLatest(
 				mFromCurrencySubject,
 				mToCurrencySubject,
 				mFromAmountSubject,
@@ -82,7 +72,22 @@ public class ExchangeViewModel implements ViewModel {
 				mBackendRatesSubject,
 				ExchangeParams::new
 		).subscribe(exchangeParams -> {
+			Log.d(TAG, "Try to make exchange!");
+
+			if (exchangeParams.getFromCurrency() == exchangeParams.getToCurrency()) {
+				return;
+			}
+
+			if (exchangeParams.getRates().isEmpty() || exchangeParams.getRates().hasError()) {
+				return;
+			}
+
+			//if ()
+
 			Log.d(TAG, "Make exchange!");
+
+			mPrevFromAmountString = exchangeParams.getFromAmountString();
+			mPrevToAmountString = exchangeParams.getToAmountString();
 		});
 	}
 
@@ -115,6 +120,26 @@ public class ExchangeViewModel implements ViewModel {
 	}
 
 	@Override
+	public void onResume() {
+		mFromCurrencySubject.subscribe(currency -> {
+			if (mIsRatesSubscriptionToBackendMade) {
+				mBackend.unsubscribeFromRatesChanges(mBackendRatesSubject);
+			}
+
+			mBackend.subscribeForRatesChanges(currency, mBackendRatesSubject);
+			mIsRatesSubscriptionToBackendMade = true;
+		});
+	}
+
+	@Override
+	public void onPause() {
+		if (mIsRatesSubscriptionToBackendMade) {
+			mBackend.unsubscribeFromRatesChanges(mBackendRatesSubject);
+			mIsRatesSubscriptionToBackendMade = false;
+		}
+	}
+
+	@Override
 	public void onCleared() {
 		if (mIsRatesSubscriptionToBackendMade) {
 			mBackend.unsubscribeFromRatesChanges(mBackendRatesSubject);
@@ -123,11 +148,11 @@ public class ExchangeViewModel implements ViewModel {
 
 	@SuppressWarnings("RedundantIfStatement")
 	private boolean isDirectExchange(final String fromAmount, final String toAmount) {
-		if (!TextUtils.isEmpty(fromAmount) && !fromAmount.equals(mPrevFromAmount)) {
+		if (!TextUtils.isEmpty(fromAmount) && !fromAmount.equals(mPrevFromAmountString)) {
 			return true;
 		}
 
-		if (!TextUtils.isEmpty(toAmount) && !toAmount.equals(mPrevToAmount)) {
+		if (!TextUtils.isEmpty(toAmount) && !toAmount.equals(mPrevToAmountString)) {
 			return false;
 		}
 

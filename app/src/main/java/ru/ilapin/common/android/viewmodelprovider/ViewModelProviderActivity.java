@@ -3,6 +3,7 @@ package ru.ilapin.common.android.viewmodelprovider;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
 import android.support.v7.app.AppCompatActivity;
+
 import io.reactivex.Observable;
 
 public class ViewModelProviderActivity extends AppCompatActivity {
@@ -27,8 +28,17 @@ public class ViewModelProviderActivity extends AppCompatActivity {
 	}
 
 	@Override
+	protected void onResume() {
+		super.onResume();
+
+		Observable.fromIterable(mRetainedFragment.getViewModles()).forEach(ViewModel::onResume);
+	}
+
+	@Override
 	protected void onPause() {
 		super.onPause();
+
+		Observable.fromIterable(mRetainedFragment.getViewModles()).forEach(ViewModel::onPause);
 
 		if (isFinishing()) {
 			Observable.fromIterable(mRetainedFragment.getViewModles()).forEach(ViewModel::onCleared);
