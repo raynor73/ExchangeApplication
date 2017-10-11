@@ -56,8 +56,12 @@ public class ExchangeViewModel implements ViewModel {
 			if (!currentRateParamsResult.isEmpty()) {
 				final String toCurrency = currentRateParamsResult.getData().getToCurrency().toString();
 				final Map<String, Double> rates = currentRateParamsResult.getData().getRates();
-				final double rate = rates.get(toCurrency);
-				mRateObservable.onNext(new Result<>(rate, false, false));
+				if (!rates.containsKey(toCurrency)) {
+					mRateObservable.onNext(new Result<>(null, false, true));
+				} else {
+					final double rate = rates.get(toCurrency);
+					mRateObservable.onNext(new Result<>(rate, false, false));
+				}
 			} else {
 				mRateObservable.onNext(new Result<>(null, false, true));
 			}
@@ -92,6 +96,9 @@ public class ExchangeViewModel implements ViewModel {
 				} catch (final NumberFormatException e) {
 					fromAmount = 0;
 				}
+				if (!rates.containsKey(toCurrency.toString())) {
+					return;
+				}
 				final double toAmount = rates.get(toCurrency.toString()) * fromAmount;
 
 				if (String.valueOf(toAmount).equals(exchangeParams.getToAmountString())) {
@@ -106,6 +113,9 @@ public class ExchangeViewModel implements ViewModel {
 					toAmount = Double.parseDouble(exchangeParams.getToAmountString());
 				} catch (final NumberFormatException e) {
 					toAmount = 0;
+				}
+				if (!rates.containsKey(toCurrency.toString())) {
+					return;
 				}
 				final double fromAmount = toAmount / rates.get(toCurrency.toString());
 
@@ -172,6 +182,8 @@ public class ExchangeViewModel implements ViewModel {
 
 	@Override
 	public void onCleared() {
+		mFromCurrencySubscription.dispose();
+
 		if (mIsRatesSubscriptionToBackendMade) {
 			mBackend.unsubscribeFromRatesChanges(mBackendRatesSubject);
 		}

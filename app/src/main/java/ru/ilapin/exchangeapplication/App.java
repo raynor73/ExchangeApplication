@@ -23,6 +23,7 @@ public class App extends Application {
 		RxJavaPlugins.setErrorHandler(throwable -> {
 			final String msg = "Error was eaten: " + throwable.getClass().getSimpleName() + ": " + throwable.getMessage();
 			Log.i(TAG, msg);
+			throwable.printStackTrace();
 		});
 	}
 }
