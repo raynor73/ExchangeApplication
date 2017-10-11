@@ -5,7 +5,8 @@ import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.view.View;
 import android.widget.*;
-import butterknife.*;
+import butterknife.BindView;
+import butterknife.ButterKnife;
 import io.reactivex.Observer;
 import io.reactivex.disposables.Disposable;
 import ru.ilapin.common.android.DefaultAdapterViewListener;
@@ -136,10 +137,6 @@ public class MainActivity extends ViewModelProviderActivity {
 		super.onPause();
 
 		disposeSubscriptions();
-	}
-
-	@OnClick(R.id.button)
-	public void onButtonClicked() {
 	}
 
 	private void makeSubscriptions() {
