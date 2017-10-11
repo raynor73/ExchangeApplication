@@ -1,16 +1,25 @@
 package ru.ilapin.exchangeapplication;
 
 import android.os.Bundle;
-import android.text.*;
-import android.util.Log;
+import android.text.Editable;
+import android.text.TextUtils;
+import android.text.TextWatcher;
 import android.view.View;
-import android.widget.*;
-import butterknife.*;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
+import android.widget.EditText;
+import android.widget.Spinner;
+import android.widget.TextView;
+
+import javax.inject.Inject;
+
+import butterknife.BindView;
+import butterknife.ButterKnife;
+import butterknife.OnClick;
+import io.reactivex.Observer;
 import io.reactivex.disposables.Disposable;
 import ru.ilapin.common.android.viewmodelprovider.ViewModelProviderActivity;
 import ru.ilapin.exchangeapplication.backend.Backend;
-
-import javax.inject.Inject;
 
 public class MainActivity extends ViewModelProviderActivity {
 
@@ -60,25 +69,27 @@ public class MainActivity extends ViewModelProviderActivity {
 		mFromCurrencySpinner.setAdapter(mCurrencySpinnerAdapter);
 		mToCurrencySpinner.setAdapter(mCurrencySpinnerAdapter);
 
+		final Observer<Backend.Currency> fromCurrencyObserver = mViewModel.getFromCurrencyObserver();
 		mFromCurrencySpinner.setOnItemSelectedListener(new DefaultAdapterViewListener() {
 
 			@Override
 			public void onItemSelected(final AdapterView<?> adapterView, final View view, final int position,
 					final long id) {
-				Log.d("!@#", "mFromCurrencySpinner: onItemSelected: " + position);
-				mViewModel.getFromCurrencyObserver().onNext(Backend.Currency.values()[position]);
+				fromCurrencyObserver.onNext(Backend.Currency.values()[position]);
 			}
 		});
+		fromCurrencyObserver.onNext(Backend.Currency.values()[0]);
 
+		final Observer<Backend.Currency> toCurrencyObserver = mViewModel.getToCurrencyObserver();
 		mToCurrencySpinner.setOnItemSelectedListener(new DefaultAdapterViewListener() {
 
 			@Override
 			public void onItemSelected(final AdapterView<?> adapterView, final View view, final int position,
 					final long id) {
-				Log.d("!@#", "mToCurrencySpinner: onItemSelected: " + position);
-				mViewModel.getToCurrencyObserver().onNext(Backend.Currency.values()[position]);
+				toCurrencyObserver.onNext(Backend.Currency.values()[position]);
 			}
 		});
+		toCurrencyObserver.onNext(Backend.Currency.values()[0]);
 
 		mFromAmountEditText.addTextChangedListener(new TextWatcher() {
 

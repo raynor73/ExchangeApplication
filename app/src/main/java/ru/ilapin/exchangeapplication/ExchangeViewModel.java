@@ -7,6 +7,7 @@ import java.util.Map;
 
 import io.reactivex.Observable;
 import io.reactivex.Observer;
+import io.reactivex.disposables.Disposable;
 import io.reactivex.subjects.BehaviorSubject;
 import io.reactivex.subjects.PublishSubject;
 import ru.ilapin.common.android.viewmodelprovider.ViewModel;
@@ -23,8 +24,8 @@ public class ExchangeViewModel implements ViewModel {
 	private final BehaviorSubject<Result<Double>> mFromAmountObservable = BehaviorSubject.create();
 	private final BehaviorSubject<Result<Double>> mToAmountObservable = BehaviorSubject.create();
 
-	private final PublishSubject<Backend.Currency> mFromCurrencySubject = PublishSubject.create();
-	private final PublishSubject<Backend.Currency> mToCurrencySubject = PublishSubject.create();
+	private final BehaviorSubject<Backend.Currency> mFromCurrencySubject = BehaviorSubject.create();
+	private final BehaviorSubject<Backend.Currency> mToCurrencySubject = BehaviorSubject.create();
 	private final PublishSubject<String> mFromAmountSubject = PublishSubject.create();
 	private final PublishSubject<String> mToAmountSubject = PublishSubject.create();
 
@@ -34,6 +35,8 @@ public class ExchangeViewModel implements ViewModel {
 
 	private String mPrevFromAmountString;
 	private String mPrevToAmountString;
+
+	private Disposable mFromCurrencySubscription;
 
 	public ExchangeViewModel(final Backend backend) {
 		mBackend = backend;
@@ -82,7 +85,19 @@ public class ExchangeViewModel implements ViewModel {
 				return;
 			}
 
-			//if ()
+			if (isDirectExchange(exchangeParams.getFromAmountString(), exchangeParams.getToAmountString())) {
+				final Map<String, Double> rates = exchangeParams.getRates().getData();
+				final Backend.Currency toCurrency = exchangeParams.getToCurrency();
+				final double fromAmount = Double.parseDouble(exchangeParams.getFromAmountString());
+				final double toAmount = rates.get(toCurrency.toString()) * fromAmount;
+				mToAmountObservable.onNext(new Result<>(toAmount, false, false));
+			} else {
+				final Map<String, Double> rates = exchangeParams.getRates().getData();
+				final Backend.Currency toCurrency = exchangeParams.getToCurrency();
+				final double toAmount = Double.parseDouble(exchangeParams.getToAmountString());
+				final double fromAmount = rates.get(toCurrency.toString()) / toAmount;
+				mToAmountObservable.onNext(new Result<>(fromAmount, false, false));
+			}
 
 			Log.d(TAG, "Make exchange!");
 
@@ -121,7 +136,7 @@ public class ExchangeViewModel implements ViewModel {
 
 	@Override
 	public void onResume() {
-		mFromCurrencySubject.subscribe(currency -> {
+		mFromCurrencySubscription = mFromCurrencySubject.subscribe(currency -> {
 			if (mIsRatesSubscriptionToBackendMade) {
 				mBackend.unsubscribeFromRatesChanges(mBackendRatesSubject);
 			}
@@ -133,6 +148,8 @@ public class ExchangeViewModel implements ViewModel {
 
 	@Override
 	public void onPause() {
+		mFromCurrencySubscription.dispose();
+
 		if (mIsRatesSubscriptionToBackendMade) {
 			mBackend.unsubscribeFromRatesChanges(mBackendRatesSubject);
 			mIsRatesSubscriptionToBackendMade = false;
