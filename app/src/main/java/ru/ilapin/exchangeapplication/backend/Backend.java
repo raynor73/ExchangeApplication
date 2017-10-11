@@ -1,6 +1,5 @@
 package ru.ilapin.exchangeapplication.backend;
 
-import android.util.Log;
 import com.google.common.base.Preconditions;
 import io.reactivex.Observable;
 import io.reactivex.Observer;
@@ -19,14 +18,13 @@ import java.util.concurrent.TimeUnit;
 
 public class Backend {
 
-	private static final String TAG = "Backend";
-
 	private static final String BASE_URL = "http://api.fixer.io/";
 
 	private final FixerService mFixerService;
 
 	private final BehaviorSubject<Result<Map<String, Double>>> mRatesChangesSubject = BehaviorSubject.create();
 	private final Map<Observer<Result<Map<String, Double>>>, RatesSubscriptions> mSubscriptions = new HashMap<>();
+	private final Map<Currency, String> mCache = new HashMap<>();
 
 	public Backend() {
 		final Retrofit retrofit = new Retrofit.Builder().baseUrl(BASE_URL).build();
@@ -37,43 +35,41 @@ public class Backend {
 
 	public void subscribeForRatesChanges(final Currency base,
 										 final Observer<Result<Map<String, Double>>> observer) {
-		final Observable<Result<Map<String, Double>>> resultObservable = Observable
-				.<Result<ResponseBody>>create(subscriber -> {
-					Log.d(TAG, "Requesting rates");
-					subscriber.onNext(new Result<>(makeRatesRequest(base), false, false));
-				})
-				.onErrorReturn(throwable -> {
-					Log.d(TAG, "Bad response: " + throwable.getMessage());
-					return new Result<>(null, true, true);
-				})
+		final Observable<Result<Map<String, Double>>> resultObservable = Observable.combineLatest(
+				Observable.<Result<String>>create(subscriber -> {
+					final String cachedData = mCache.get(base);
+					if (cachedData != null) {
+						subscriber.onNext(new Result<>(cachedData, false, false));
+					} else {
+						subscriber.onNext(new Result<>(null, true, true));
+					}
+				}),
+				Observable.<Result<String>>create(subscriber -> subscriber.onNext(new Result<>(makeRatesRequest(base), false, false))),
+				(cachedResult, networkResult) -> {
+					if (!networkResult.isEmpty()) {
+						return networkResult;
+					} else {
+						return cachedResult;
+					}
+				}
+		).onErrorReturn(throwable -> new Result<>(null, true, true))
 				.<Result<Map<String, Double>>>map(result -> {
 					if (result.isEmpty() || result.hasError()) {
 						return new Result<>(null, result.hasError(), result.isEmpty());
 					} else {
-						return new Result<>(parseRates(result.getData().string()), false, false);
+						final String data = result.getData();
+						mCache.put(base, data);
+						return new Result<>(parseRates(data), false, false);
 					}
 				})
-				.onErrorReturn(throwable -> {
-					Log.d(TAG, "Can't parse: " + throwable.getMessage());
-					return new Result<>(null, true, true);
-				});
+				.onErrorReturn(throwable -> new Result<>(null, true, true));
 
 		final Disposable subjectSubscription = mRatesChangesSubject.subscribe(observer::onNext);
 		final Disposable intervalSubscription = Observable.interval(0, 3, TimeUnit.SECONDS)
 				.flatMap(x -> resultObservable)
 				.subscribeOn(Schedulers.io())
 				.observeOn(AndroidSchedulers.mainThread())
-				.subscribe(result -> {
-					Log.d("!@#", "Rates Received");
-					mRatesChangesSubject.onNext(result);
-				});
-		/*final Disposable intervalSubscription = resultObservable.retry()
-				.subscribeOn(Schedulers.io())
-				.observeOn(AndroidSchedulers.mainThread())
-				.subscribe(result -> {
-					Log.d("!@#", "Rates Received");
-					mRatesChangesSubject.onNext(result);
-				});*/
+				.subscribe(mRatesChangesSubject::onNext);
 
 		mSubscriptions.put(observer, new RatesSubscriptions(subjectSubscription, intervalSubscription));
 	}
@@ -85,8 +81,9 @@ public class Backend {
 		mSubscriptions.remove(observer);
 	}
 
-	private ResponseBody makeRatesRequest(final Currency base) throws IOException {
-		return mFixerService.latest(base.toString()).execute().body();
+	private String makeRatesRequest(final Currency base) throws IOException {
+		final ResponseBody responseBody = mFixerService.latest(base.toString()).execute().body();
+		return responseBody != null ? responseBody.string() : "";
 	}
 
 	private Map<String, Double> parseRates(final String responseString) throws JSONException {
