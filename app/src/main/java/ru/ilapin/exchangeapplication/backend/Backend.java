@@ -65,7 +65,7 @@ public class Backend {
 				.onErrorReturn(throwable -> new Result<>(null, true, true));
 
 		final Disposable subjectSubscription = mRatesChangesSubject.subscribe(observer::onNext);
-		final Disposable intervalSubscription = Observable.interval(0, 3, TimeUnit.SECONDS)
+		final Disposable intervalSubscription = Observable.interval(0, 30, TimeUnit.SECONDS)
 				.flatMap(x -> resultObservable)
 				.subscribeOn(Schedulers.io())
 				.observeOn(AndroidSchedulers.mainThread())
