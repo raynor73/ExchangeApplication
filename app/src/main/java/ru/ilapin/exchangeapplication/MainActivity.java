@@ -14,6 +14,7 @@ import ru.ilapin.common.android.viewmodelprovider.ViewModelProviderActivity;
 import ru.ilapin.exchangeapplication.backend.Backend;
 
 import javax.inject.Inject;
+import java.util.Locale;
 
 public class MainActivity extends ViewModelProviderActivity {
 
@@ -154,7 +155,7 @@ public class MainActivity extends ViewModelProviderActivity {
 			mFromAmountEditText.removeTextChangedListener(mFromAmountTextWatcher);
 
 			if (!result.isEmpty()) {
-				mFromAmountEditText.setText(String.valueOf(result.getData()));
+				mFromAmountEditText.setText(String.format(Locale.US, "%.2f", result.getData()));
 			} else {
 				mFromAmountEditText.setText(null);
 			}
@@ -166,7 +167,7 @@ public class MainActivity extends ViewModelProviderActivity {
 			mToAmountEditText.removeTextChangedListener(mToAmountTextWatcher);
 
 			if (!result.isEmpty()) {
-				mToAmountEditText.setText(String.valueOf(result.getData()));
+				mToAmountEditText.setText(String.format(Locale.US, "%.2f", result.getData()));
 			} else {
 				mToAmountEditText.setText(null);
 			}
