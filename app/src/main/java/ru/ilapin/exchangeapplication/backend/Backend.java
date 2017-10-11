@@ -63,7 +63,17 @@ public class Backend {
 				.flatMap(x -> resultObservable)
 				.subscribeOn(Schedulers.io())
 				.observeOn(AndroidSchedulers.mainThread())
-				.subscribe(mRatesChangesSubject::onNext);
+				.subscribe(result -> {
+					Log.d("!@#", "Rates Received");
+					mRatesChangesSubject.onNext(result);
+				});
+		/*final Disposable intervalSubscription = resultObservable.retry()
+				.subscribeOn(Schedulers.io())
+				.observeOn(AndroidSchedulers.mainThread())
+				.subscribe(result -> {
+					Log.d("!@#", "Rates Received");
+					mRatesChangesSubject.onNext(result);
+				});*/
 
 		mSubscriptions.put(observer, new RatesSubscriptions(subjectSubscription, intervalSubscription));
 	}

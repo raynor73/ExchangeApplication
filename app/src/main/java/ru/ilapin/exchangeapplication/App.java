@@ -21,8 +21,8 @@ public class App extends Application {
 		sApplicationComponent = DaggerApplicationComponent.builder().systemModule(new SystemModule(this)).build();
 
 		RxJavaPlugins.setErrorHandler(throwable -> {
-			final String msg = "Caught error: " + throwable.getClass().getSimpleName() + ": " + throwable.getMessage();
-			Log.d(TAG, msg);
+			final String msg = "Error was eaten: " + throwable.getClass().getSimpleName() + ": " + throwable.getMessage();
+			Log.i(TAG, msg);
 		});
 	}
 }

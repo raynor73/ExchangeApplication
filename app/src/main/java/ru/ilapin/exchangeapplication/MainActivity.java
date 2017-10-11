@@ -1,25 +1,19 @@
 package ru.ilapin.exchangeapplication;
 
 import android.os.Bundle;
-import android.text.Editable;
 import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.view.View;
-import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
-import android.widget.EditText;
-import android.widget.Spinner;
-import android.widget.TextView;
-
-import javax.inject.Inject;
-
-import butterknife.BindView;
-import butterknife.ButterKnife;
-import butterknife.OnClick;
+import android.widget.*;
+import butterknife.*;
 import io.reactivex.Observer;
 import io.reactivex.disposables.Disposable;
+import ru.ilapin.common.android.DefaultAdapterViewListener;
+import ru.ilapin.common.android.DefaultTextWatcher;
 import ru.ilapin.common.android.viewmodelprovider.ViewModelProviderActivity;
 import ru.ilapin.exchangeapplication.backend.Backend;
+
+import javax.inject.Inject;
 
 public class MainActivity extends ViewModelProviderActivity {
 
@@ -39,11 +33,43 @@ public class MainActivity extends ViewModelProviderActivity {
 
 	private ExchangeViewModel mViewModel;
 
-	private ArrayAdapter<Backend.Currency> mCurrencySpinnerAdapter;
-
 	private Disposable mRatesSubscription;
 	private Disposable mFromAmountSubscription;
 	private Disposable mToAmountSubscription;
+
+	private final TextWatcher mFromAmountTextWatcher = new DefaultTextWatcher() {
+
+		private String mOldText;
+
+		@Override
+		public void beforeTextChanged(final CharSequence s, final int start, final int count, final int after) {
+			mOldText = s.toString();
+		}
+
+		@Override
+		public void onTextChanged(final CharSequence s, final int start, final int before, final int count) {
+			if (TextUtils.isEmpty(mOldText) || !mOldText.equals(s.toString())) {
+				mViewModel.getFromAmountObserver().onNext(s.toString());
+			}
+		}
+	};
+
+	private final TextWatcher mToAmountTextWatcher = new DefaultTextWatcher() {
+
+		private String mOldText;
+
+		@Override
+		public void beforeTextChanged(final CharSequence s, final int start, final int count, final int after) {
+			mOldText = s.toString();
+		}
+
+		@Override
+		public void onTextChanged(final CharSequence s, final int start, final int before, final int count) {
+			if (TextUtils.isEmpty(mOldText) || !mOldText.equals(s.toString())) {
+				mViewModel.getToAmountObserver().onNext(s.toString());
+			}
+		}
+	};
 
 	@Override
 	protected void onCreate(final Bundle savedInstanceState) {
@@ -59,15 +85,15 @@ public class MainActivity extends ViewModelProviderActivity {
 			putViewModel(mViewModel);
 		}
 
-		mCurrencySpinnerAdapter = new ArrayAdapter<>(
+		final ArrayAdapter<Backend.Currency> currencySpinnerAdapter = new ArrayAdapter<>(
 				this,
 				android.R.layout.simple_spinner_item,
 				Backend.Currency.values()
 		);
-		mCurrencySpinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+		currencySpinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
 
-		mFromCurrencySpinner.setAdapter(mCurrencySpinnerAdapter);
-		mToCurrencySpinner.setAdapter(mCurrencySpinnerAdapter);
+		mFromCurrencySpinner.setAdapter(currencySpinnerAdapter);
+		mToCurrencySpinner.setAdapter(currencySpinnerAdapter);
 
 		final Observer<Backend.Currency> fromCurrencyObserver = mViewModel.getFromCurrencyObserver();
 		mFromCurrencySpinner.setOnItemSelectedListener(new DefaultAdapterViewListener() {
@@ -91,49 +117,10 @@ public class MainActivity extends ViewModelProviderActivity {
 		});
 		toCurrencyObserver.onNext(Backend.Currency.values()[0]);
 
-		mFromAmountEditText.addTextChangedListener(new TextWatcher() {
-
-			private String mOldText;
-
-			@Override
-			public void beforeTextChanged(final CharSequence s, final int start, final int count, final int after) {
-				mOldText = s.toString();
-			}
-
-			@Override
-			public void onTextChanged(final CharSequence s, final int start, final int before, final int count) {
-				if (!TextUtils.isEmpty(mOldText) && !mOldText.equals(s.toString())) {
-					mViewModel.getFromAmountObserver().onNext(s.toString());
-				}
-			}
-
-			@Override
-			public void afterTextChanged(final Editable s) {
-				// do nothing
-			}
-		});
-
-		mToAmountEditText.addTextChangedListener(new TextWatcher() {
-
-			private String mOldText;
-
-			@Override
-			public void beforeTextChanged(final CharSequence s, final int start, final int count, final int after) {
-				mOldText = s.toString();
-			}
-
-			@Override
-			public void onTextChanged(final CharSequence s, final int start, final int before, final int count) {
-				if (!TextUtils.isEmpty(mOldText) && !mOldText.equals(s.toString())) {
-					mViewModel.getToAmountObserver().onNext(s.toString());
-				}
-			}
-
-			@Override
-			public void afterTextChanged(final Editable s) {
-				// do nothing
-			}
-		});
+		mFromAmountEditText.addTextChangedListener(mFromAmountTextWatcher);
+		mViewModel.getFromAmountObserver().onNext("");
+		mToAmountEditText.addTextChangedListener(mToAmountTextWatcher);
+		mViewModel.getToAmountObserver().onNext("");
 	}
 
 	@Override
@@ -164,19 +151,27 @@ public class MainActivity extends ViewModelProviderActivity {
 		});
 
 		mFromAmountSubscription = mViewModel.getFromAmountObservable().subscribe(result -> {
+			mFromAmountEditText.removeTextChangedListener(mFromAmountTextWatcher);
+
 			if (!result.isEmpty()) {
 				mFromAmountEditText.setText(String.valueOf(result.getData()));
 			} else {
 				mFromAmountEditText.setText(null);
 			}
+
+			mFromAmountEditText.addTextChangedListener(mFromAmountTextWatcher);
 		});
 
 		mToAmountSubscription = mViewModel.getToAmountObservable().subscribe(result -> {
+			mToAmountEditText.removeTextChangedListener(mToAmountTextWatcher);
+
 			if (!result.isEmpty()) {
 				mToAmountEditText.setText(String.valueOf(result.getData()));
 			} else {
 				mToAmountEditText.setText(null);
 			}
+
+			mToAmountEditText.addTextChangedListener(mToAmountTextWatcher);
 		});
 	}
 

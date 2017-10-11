@@ -1,10 +1,6 @@
 package ru.ilapin.exchangeapplication;
 
 import android.text.TextUtils;
-import android.util.Log;
-
-import java.util.Map;
-
 import io.reactivex.Observable;
 import io.reactivex.Observer;
 import io.reactivex.disposables.Disposable;
@@ -14,9 +10,9 @@ import ru.ilapin.common.android.viewmodelprovider.ViewModel;
 import ru.ilapin.exchangeapplication.backend.Backend;
 import ru.ilapin.exchangeapplication.backend.Result;
 
-public class ExchangeViewModel implements ViewModel {
+import java.util.Map;
 
-	private static final String TAG = "ExchangeViewModel";
+public class ExchangeViewModel implements ViewModel {
 
 	private final Backend mBackend;
 
@@ -75,8 +71,6 @@ public class ExchangeViewModel implements ViewModel {
 				mBackendRatesSubject,
 				ExchangeParams::new
 		).subscribe(exchangeParams -> {
-			Log.d(TAG, "Try to make exchange!");
-
 			if (exchangeParams.getFromCurrency() == exchangeParams.getToCurrency()) {
 				return;
 			}
@@ -85,21 +79,41 @@ public class ExchangeViewModel implements ViewModel {
 				return;
 			}
 
-			if (isDirectExchange(exchangeParams.getFromAmountString(), exchangeParams.getToAmountString())) {
+			final ConversionWay conversionWay = determineConversionWay(
+					exchangeParams.getFromAmountString(),
+					exchangeParams.getToAmountString()
+			);
+			if (conversionWay == ConversionWay.DIRECT) {
 				final Map<String, Double> rates = exchangeParams.getRates().getData();
 				final Backend.Currency toCurrency = exchangeParams.getToCurrency();
-				final double fromAmount = Double.parseDouble(exchangeParams.getFromAmountString());
+				double fromAmount;
+				try {
+					fromAmount = Double.parseDouble(exchangeParams.getFromAmountString());
+				} catch (final NumberFormatException e) {
+					fromAmount = 0;
+				}
 				final double toAmount = rates.get(toCurrency.toString()) * fromAmount;
+
+				if (String.valueOf(toAmount).equals(exchangeParams.getToAmountString())) {
+					return;
+				}
 				mToAmountObservable.onNext(new Result<>(toAmount, false, false));
-			} else {
+			} else if (conversionWay == ConversionWay.REVERSE) {
 				final Map<String, Double> rates = exchangeParams.getRates().getData();
 				final Backend.Currency toCurrency = exchangeParams.getToCurrency();
-				final double toAmount = Double.parseDouble(exchangeParams.getToAmountString());
-				final double fromAmount = rates.get(toCurrency.toString()) / toAmount;
-				mToAmountObservable.onNext(new Result<>(fromAmount, false, false));
-			}
+				double toAmount;
+				try {
+					toAmount = Double.parseDouble(exchangeParams.getToAmountString());
+				} catch (final NumberFormatException e) {
+					toAmount = 0;
+				}
+				final double fromAmount = toAmount / rates.get(toCurrency.toString());
 
-			Log.d(TAG, "Make exchange!");
+				if (String.valueOf(fromAmount).equals(exchangeParams.getFromAmountString())) {
+					return;
+				}
+				mFromAmountObservable.onNext(new Result<>(fromAmount, false, false));
+			}
 
 			mPrevFromAmountString = exchangeParams.getFromAmountString();
 			mPrevToAmountString = exchangeParams.getToAmountString();
@@ -164,16 +178,20 @@ public class ExchangeViewModel implements ViewModel {
 	}
 
 	@SuppressWarnings("RedundantIfStatement")
-	private boolean isDirectExchange(final String fromAmount, final String toAmount) {
+	private ConversionWay determineConversionWay(final String fromAmount, final String toAmount) {
 		if (!TextUtils.isEmpty(fromAmount) && !fromAmount.equals(mPrevFromAmountString)) {
-			return true;
+			return ConversionWay.DIRECT;
 		}
 
 		if (!TextUtils.isEmpty(toAmount) && !toAmount.equals(mPrevToAmountString)) {
-			return false;
+			return ConversionWay.REVERSE;
 		}
 
-		return true;
+		return ConversionWay.NO_CONVERSION;
+	}
+
+	private enum ConversionWay {
+		NO_CONVERSION, DIRECT, REVERSE
 	}
 
 	private class CurrentRateParams {
